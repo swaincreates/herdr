@@ -800,6 +800,8 @@ pub struct UiConfig {
     pub confirm_close: bool,
     /// Ask for a tab name before creating a new tab. Default: true.
     pub prompt_new_tab_name: bool,
+    /// Ask for a workspace name when creating a new workspace. Default: true.
+    pub prompt_new_workspace_name: bool,
     /// Draw borders around split panes. Default: true.
     pub pane_borders: bool,
     /// Keep split panes visually separated instead of sharing divider borders. Default: true.
@@ -1000,6 +1002,7 @@ impl Default for UiConfig {
             mouse_scroll_lines: None,
             confirm_close: true,
             prompt_new_tab_name: true,
+            prompt_new_workspace_name: true,
             pane_borders: true,
             pane_gaps: true,
             show_agent_labels_on_pane_borders: false,
@@ -1274,6 +1277,19 @@ prompt_new_tab_name = false
 "#;
         let config: Config = toml::from_str(toml).unwrap();
         assert!(!config.ui.prompt_new_tab_name);
+    }
+
+    #[test]
+    fn prompt_new_workspace_name_defaults_on_and_parses() {
+        let default_config = Config::default();
+        assert!(default_config.ui.prompt_new_workspace_name);
+
+        let toml = r#"
+[ui]
+prompt_new_workspace_name = false
+"#;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert!(!config.ui.prompt_new_workspace_name);
     }
 
     #[test]

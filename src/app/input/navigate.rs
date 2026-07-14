@@ -193,7 +193,16 @@ impl App {
                         env: Default::default(),
                     },
                 );
-                leave_navigate_mode(&mut self.state);
+                // The new workspace is created focused, so `active` now points at it.
+                // Prompt for a name immediately unless the user opted out.
+                match self
+                    .state
+                    .active
+                    .filter(|_| self.state.prompt_new_workspace_name)
+                {
+                    Some(ws_idx) => self.open_new_workspace_name_prompt(ws_idx),
+                    None => leave_navigate_mode(&mut self.state),
+                }
             }
             NavigateAction::NewWorktree => {
                 if let Some(ws_idx) = workspace_action_target(&self.state, context).filter(|idx| {
@@ -430,6 +439,16 @@ impl App {
     pub(crate) fn close_workspace_idx_via_api(&mut self, ws_idx: usize) {
         let workspace_id = self.public_workspace_id(ws_idx);
         self.runtime_workspace_close("tui.workspace.close", workspace_id);
+    }
+
+    /// Open the rename dialog for a freshly created workspace so it can be named right away,
+    /// mirroring the new-tab name prompt. Gated by `ui.prompt_new_workspace_name`.
+    pub(crate) fn open_new_workspace_name_prompt(&mut self, ws_idx: usize) {
+        super::modal::open_rename_workspace(&mut self.state, &self.terminal_runtimes, ws_idx);
+        // Unlike renaming an existing workspace, a brand-new one should let the first
+        // keystroke replace the generated name instead of forcing a backspace through it
+        // (matches the new-tab prompt).
+        self.state.name_input_replace_on_type = true;
     }
 
     pub(crate) fn move_workspace_via_api(&mut self, source_ws_idx: usize, insert_idx: usize) {
@@ -1893,6 +1912,41 @@ mod tests {
 
         assert_eq!(state.mode, Mode::RenameWorkspace);
         assert_eq!(state.name_input, "test");
+    }
+
+    #[test]
+    fn open_new_workspace_name_prompt_enters_rename_mode_for_new_workspace() {
+        let mut app = app_with_test_workspaces(&["one", "two"]);
+        // A freshly created workspace is focused, so `active` points at it.
+        app.state.active = Some(1);
+
+        app.open_new_workspace_name_prompt(1);
+
+        assert_eq!(app.state.mode, Mode::RenameWorkspace);
+        assert_eq!(app.state.selected, 1);
+        assert_eq!(app.state.name_input, "two");
+        // First keystroke should replace the generated name, not append to it.
+        assert!(app.state.name_input_replace_on_type);
+    }
+
+    #[tokio::test]
+    async fn new_workspace_key_opens_rename_prompt_when_enabled() {
+        let mut app = app_with_test_workspaces(&["one"]);
+        app.state.prompt_new_workspace_name = true;
+
+        app.execute_tui_navigate_action(NavigateAction::NewWorkspace, ActionContext::Prefix);
+
+        assert_eq!(app.state.mode, Mode::RenameWorkspace);
+    }
+
+    #[tokio::test]
+    async fn new_workspace_key_skips_rename_prompt_when_disabled() {
+        let mut app = app_with_test_workspaces(&["one"]);
+        app.state.prompt_new_workspace_name = false;
+
+        app.execute_tui_navigate_action(NavigateAction::NewWorkspace, ActionContext::Prefix);
+
+        assert_ne!(app.state.mode, Mode::RenameWorkspace);
     }
 
     #[test]

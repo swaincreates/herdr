@@ -611,6 +611,7 @@ impl App {
             mouse_scroll_lines: config.ui.mouse_scroll_lines(),
             confirm_close: config.ui.confirm_close,
             prompt_new_tab_name: config.ui.prompt_new_tab_name,
+            prompt_new_workspace_name: config.ui.prompt_new_workspace_name,
             pane_borders: config.ui.pane_borders,
             pane_gaps: config.ui.pane_gaps,
             show_agent_labels_on_pane_borders: config.ui.show_agent_labels_on_pane_borders,
@@ -927,6 +928,13 @@ impl App {
                         env: Default::default(),
                     },
                 );
+                // The new workspace is created focused, so `active` now points at it.
+                // Prompt for a name immediately unless the user opted out.
+                if self.state.prompt_new_workspace_name {
+                    if let Some(ws_idx) = self.state.active {
+                        self.open_new_workspace_name_prompt(ws_idx);
+                    }
+                }
                 needs_render = true;
             }
 
@@ -1396,6 +1404,7 @@ impl App {
                     config.ui.right_click_passthrough_modifiers();
                 self.state.confirm_close = config.ui.confirm_close;
                 self.state.prompt_new_tab_name = config.ui.prompt_new_tab_name;
+                self.state.prompt_new_workspace_name = config.ui.prompt_new_workspace_name;
                 self.state.pane_borders = config.ui.pane_borders;
                 self.state.pane_gaps = config.ui.pane_gaps;
                 self.state.show_agent_labels_on_pane_borders =

@@ -637,6 +637,12 @@ impl HeadlessServer {
                     message = %error.message,
                     "failed to create workspace"
                 );
+            } else if self.app.state.prompt_new_workspace_name {
+                // The new workspace is created focused, so `active` now points at it.
+                // Prompt for a name immediately unless the user opted out.
+                if let Some(ws_idx) = self.app.state.active {
+                    self.app.open_new_workspace_name_prompt(ws_idx);
+                }
             }
             needs_render = true;
             crate::render_prof::event("full_render_cause.deferred_new_workspace");
@@ -4451,6 +4457,34 @@ mod tests {
                 api::schema::EventKind::LayoutUpdated,
             ]
         );
+        shutdown_test_runtimes(&mut server);
+    }
+
+    #[tokio::test]
+    async fn headless_new_workspace_opens_rename_prompt_when_enabled() {
+        let event_hub = api::EventHub::default();
+        let mut server = test_headless_server_with_event_hub(event_hub.clone());
+
+        server.app.state.prompt_new_workspace_name = true;
+        server.app.state.request_new_workspace = true;
+
+        assert!(server.handle_deferred_requests_headless());
+        assert!(!server.app.state.request_new_workspace);
+        assert_eq!(server.app.state.mode, app::Mode::RenameWorkspace);
+        shutdown_test_runtimes(&mut server);
+    }
+
+    #[tokio::test]
+    async fn headless_new_workspace_skips_rename_prompt_when_disabled() {
+        let event_hub = api::EventHub::default();
+        let mut server = test_headless_server_with_event_hub(event_hub.clone());
+
+        server.app.state.prompt_new_workspace_name = false;
+        server.app.state.request_new_workspace = true;
+
+        assert!(server.handle_deferred_requests_headless());
+        assert!(!server.app.state.request_new_workspace);
+        assert_ne!(server.app.state.mode, app::Mode::RenameWorkspace);
         shutdown_test_runtimes(&mut server);
     }
 

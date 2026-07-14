@@ -288,6 +288,10 @@ const DEFAULT_CONFIG: &str = r##"# herdr configuration
 # Set false to create tabs immediately with generated names.
 # prompt_new_tab_name = true
 
+# Ask for a workspace name when creating a new workspace.
+# Set false to create workspaces immediately with generated names.
+# prompt_new_workspace_name = true
+
 # Draw borders around split panes.
 # pane_borders = true
 
