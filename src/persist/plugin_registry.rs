@@ -1,4 +1,5 @@
 use std::path::{Path, PathBuf};
+use std::sync::OnceLock;
 
 use tracing::warn;
 
@@ -6,8 +7,42 @@ use crate::api::schema::InstalledPluginInfo;
 
 pub const MANIFEST_UNAVAILABLE_WARNING_PREFIX: &str = "manifest unavailable: ";
 
+/// Whether plugins share one registry across all sessions
+/// (`experimental.global_plugins`). Resolved from config once per process and
+/// cached, so the running server and any offline CLI invocation agree on the
+/// registry path. Takes effect on process (re)start.
+fn global_plugins_enabled() -> bool {
+    static CACHE: OnceLock<bool> = OnceLock::new();
+    *CACHE.get_or_init(|| {
+        crate::config::Config::load()
+            .config
+            .experimental
+            .global_plugins
+    })
+}
+
 fn registry_path() -> PathBuf {
-    crate::session::data_dir().join("plugins.json")
+    registry_path_for(
+        global_plugins_enabled(),
+        crate::config::config_dir(),
+        crate::session::data_dir(),
+    )
+}
+
+/// Pure resolution of the registry location given the flag and the two candidate
+/// dirs. When `global_plugins` is set the registry is the shared one at the
+/// top-level config dir, independent of the active session; otherwise it lives
+/// next to the active session's `session.json`.
+fn registry_path_for(
+    global_plugins: bool,
+    config_dir: PathBuf,
+    session_data_dir: PathBuf,
+) -> PathBuf {
+    if global_plugins {
+        config_dir.join("plugins.json")
+    } else {
+        session_data_dir.join("plugins.json")
+    }
 }
 
 fn save_json_to_path<T: serde::Serialize + ?Sized>(path: &Path, value: &T) -> std::io::Result<()> {
@@ -130,6 +165,24 @@ mod tests {
             source: Default::default(),
             warnings: vec![],
         }
+    }
+
+    #[test]
+    fn registry_path_honors_global_plugins_flag() {
+        let config_dir = PathBuf::from("/cfg");
+        let session_dir = config_dir.join("sessions").join("alpha");
+
+        // Flag on: shared registry at the top-level config dir, session ignored.
+        assert_eq!(
+            registry_path_for(true, config_dir.clone(), session_dir.clone()),
+            PathBuf::from("/cfg/plugins.json"),
+        );
+
+        // Flag off (default): per-session registry next to session.json.
+        assert_eq!(
+            registry_path_for(false, config_dir, session_dir),
+            PathBuf::from("/cfg/sessions/alpha/plugins.json"),
+        );
     }
 
     #[test]

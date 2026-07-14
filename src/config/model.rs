@@ -913,6 +913,14 @@ pub struct ExperimentalConfig {
     /// source when prefix mode exits. macOS only; a no-op elsewhere and a
     /// best-effort no-op if the switch fails. Default: false.
     pub switch_ascii_input_source_in_prefix: bool,
+    /// Share one plugin registry across all sessions instead of keeping one per
+    /// session. When true, `plugins.json` is read from and written to the
+    /// top-level config dir (`~/.config/herdr/plugins.json`) regardless of the
+    /// active session, so a plugin installed in any session is available in all
+    /// of them — and compiled plugins build only once instead of per session.
+    /// When false (default) each session keeps its own registry under
+    /// `sessions/<name>/plugins.json`. Takes effect on server (re)start.
+    pub global_plugins: bool,
 }
 
 impl Default for KeysConfig {
